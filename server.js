@@ -1,52 +1,25 @@
-const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
+const request = require('request');
+const token = '7025543734:AAH-chmUhJazD4z2cY9Xv2TdIYIdOWDjgdQ';
+const bot = new TelegramBot(token, {polling: true});
 
-// Replace with your actual Telegram Bot Token and Chat ID
-const telegram_chat_token = '7025543734:AAH-chmUhJazD4z2cY9Xv2TdIYIdOWDjgdQ';
-const telegram_chat_id = '-1002163417763'; // Ensure this is the correct chat ID
+bot.onText(/\/movie (.+)/, function(msg, match) {
+    var chatId = msg.chat.id;
+    var movie = match[1];
 
-const bot = new TelegramBot(telegram_chat_token, { polling: false });
-
-async function getRandomWikipedia() {
-    try {
-        // Fetching a random Wikipedia article
-        const wikiResponse = await axios.get('https://en.wikipedia.org/api/rest_v1/page/random/summary');
-        return wikiResponse.data;
-    } catch (error) {
-        console.error('Error fetching Wikipedia article:', error);
-        return null;
-    }
-}
-
-async function postToTelegram(article) {
-    // let message = `${article.title}\n\n${article.extract}\n\nRead more: ${article.content_urls.desktop.page}`;
-    
-    if (message.length > 4096) {
-        message = message.substring(0, 4093) + '...';
-    }
-    
-    try {
-        await bot.sendMessage(telegram_chat_id, message);
-        console.log('Article posted to Telegram successfully.');
-    } catch (error) {
-        console.error('Error posting to Telegram:', error.response ? error.response.body : error.message);
-    }
-}
-
-async function main() {
-    try {
-        console.log('Telegram Chat ID:', telegram_chat_id);
-        
-        const article = await getRandomWikipedia();
-        if (article) {
-            await postToTelegram(article);
+    request(`https://www.omdbapi.com/?t=${movie}&apikey=50393264`, function(error, response, body) {
+        if (!error && response.statusCode == 200) {
+            bot.sendMessage(chatId, `_Looking for_ `+ movie +`...`, {parse_mode: 'Markdown'})
+            .then(function(msg) {
+                var res = JSON.parse(body);
+                if (res.Response === "True") {
+                    bot.sendPhoto(chatId, res.Poster, {caption: `Result:\nTitle: ${res.Title}\nYear: ${res.Year}\nRated: ${res.Rated}\nReleased: ${res.Released}`});
+                } else {
+                    bot.sendMessage(chatId, `Movie not found!`);
+                }
+            });
         } else {
-            console.log('Failed to fetch Wikipedia article');
+            bot.sendMessage(chatId, `Error: ${error}`);
         }
-    } catch (error) {
-        console.error('Error in main function:', error);
-    }
-}
-
-// Run the main function
-main().catch(error => console.error('Unhandled error:', error));
+    });
+});
